@@ -14,7 +14,7 @@ scene.add(directionalLight);
 
 // Physics world
 const world = new CANNON.World();
-world.gravity.set(0, -9.8, 0); // m/s²
+world.gravity.set(0, -20, 0); // m/s²
 
 // Materials
 const ballMaterial = new CANNON.Material('ballMaterial');
@@ -153,7 +153,7 @@ for (let i = 0; i < 16; i++) { // Create 16 balls (0-15)
     ballMeshes.push(ballMesh);
 
     const ballBody = new CANNON.Body({
-        mass: 0.17,
+        mass: 1,
         position: new CANNON.Vec3(
             (Math.random() - 0.5) * (cubeSize - ballRadius * 2),
             (Math.random() - 0.5) * (cubeSize - ballRadius * 2),
