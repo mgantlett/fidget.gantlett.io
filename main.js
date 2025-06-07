@@ -14,7 +14,7 @@ scene.add(directionalLight);
 
 // Physics world
 const world = new CANNON.World();
-world.gravity.set(0, -20, 0); // m/s²
+world.gravity.set(0, -9.8, 0); // m/s²
 
 // Materials
 const ballMaterial = new CANNON.Material('ballMaterial');
@@ -153,7 +153,7 @@ for (let i = 0; i < 16; i++) { // Create 16 balls (0-15)
     ballMeshes.push(ballMesh);
 
     const ballBody = new CANNON.Body({
-        mass: 1,
+        mass: 0.17,
         position: new CANNON.Vec3(
             (Math.random() - 0.5) * (cubeSize - ballRadius * 2),
             (Math.random() - 0.5) * (cubeSize - ballRadius * 2),
@@ -176,6 +176,9 @@ camera.position.z = 20;
 // Mouse controls
 let previousMousePosition = { x: 0, y: 0 };
 let isMouseDown = false;
+let previousPinchDistance = null;
+let touchStartTime = 0;
+let touchMoved = false;
 
 // Physics-based rotation
 const rotationSpeed = 0.1;
@@ -200,6 +203,55 @@ document.addEventListener('mousemove', (event) => {
 
     previousMousePosition = { x: event.clientX, y: event.clientY };
 });
+
+// Touch controls
+document.addEventListener('touchstart', (event) => {
+    isMouseDown = true;
+    touchMoved = false;
+    touchStartTime = new Date().getTime();
+    previousMousePosition = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+});
+
+document.addEventListener('touchend', (event) => {
+    isMouseDown = false;
+    const touchEndTime = new Date().getTime();
+    if (!touchMoved && touchEndTime - touchStartTime < 200) { // Tap gesture
+        const newColor = new THREE.Color(Math.random(), Math.random(), Math.random());
+        cubeMaterial.color.set(newColor);
+        edgesMaterial.color.set(newColor);
+    }
+});
+
+document.addEventListener('touchmove', (event) => {
+    if (!isMouseDown) return;
+
+    event.preventDefault();
+
+    // Handle pinch-to-zoom
+    touchMoved = true;
+    if (event.touches.length === 2) {
+        const touch1 = event.touches[0];
+        const touch2 = event.touches[1];
+        const distance = Math.hypot(touch1.pageX - touch2.pageX, touch1.pageY - touch2.pageY);
+
+        if (previousPinchDistance) {
+            const delta = distance - previousPinchDistance;
+            camera.position.z -= delta * 0.1;
+        }
+        previousPinchDistance = distance;
+        return; // Skip rotation when zooming
+    } else {
+        previousPinchDistance = null;
+    }
+
+    const deltaX = event.touches[0].clientX - previousMousePosition.x;
+    const deltaY = event.touches[0].clientY - previousMousePosition.y;
+
+    cubeBody.angularVelocity.y += deltaX * rotationSpeed * 0.1;
+    cubeBody.angularVelocity.x += deltaY * rotationSpeed * 0.1;
+
+    previousMousePosition = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+}, { passive: false });
 
 document.addEventListener('keydown', (event) => {
     if (event.code === 'Space') {
