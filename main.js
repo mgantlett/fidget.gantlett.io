@@ -182,6 +182,7 @@ let touchMoved = false;
 
 // Physics-based rotation
 const rotationSpeed = 0.1;
+const maxAngularVelocity = 10; // radians per second
 
 document.addEventListener('mousedown', (event) => {
     isMouseDown = true;
@@ -276,7 +277,7 @@ function animate() {
     oldElapsedTime = elapsedTime;
 
     // Step the physics world
-    world.step(1 / 60, deltaTime, 10);
+    world.step(1 / 60, deltaTime, 20); // Increased maxSubSteps from 10 to 20
 
     // Since the cube is now a kinematic body, the physics engine handles its rotation based on its angular velocity.
     // We can apply damping if we want it to slow down. The user wants it to spin indefinitely.
@@ -285,6 +286,11 @@ function animate() {
         // For a slowing effect, you could use:
         // cubeBody.angularVelocity.scale(0.98, cubeBody.angularVelocity);
     }
+
+    // Clamp angular velocity to prevent excessive speeds
+    cubeBody.angularVelocity.x = Math.max(-maxAngularVelocity, Math.min(maxAngularVelocity, cubeBody.angularVelocity.x));
+    cubeBody.angularVelocity.y = Math.max(-maxAngularVelocity, Math.min(maxAngularVelocity, cubeBody.angularVelocity.y));
+    cubeBody.angularVelocity.z = Math.max(-maxAngularVelocity, Math.min(maxAngularVelocity, cubeBody.angularVelocity.z));
 
     // Update ball positions
     for (let i = 0; i < balls.length; i++) {
