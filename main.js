@@ -14,14 +14,15 @@ scene.add(directionalLight);
 
 // Physics world
 const world = new CANNON.World();
-world.gravity.set(0, -20, 0); // m/s²
+world.gravity.set(0, -30, 0); // m/s²
+world.solver.iterations = 20; // Increase solver iterations for more accuracy
 
 // Materials
 const ballMaterial = new CANNON.Material('ballMaterial');
 const wallMaterial = new CANNON.Material('wallMaterial');
 const ballWallContactMaterial = new CANNON.ContactMaterial(ballMaterial, wallMaterial, {
-    friction: 0.1,
-    restitution: 0.7
+    friction: 0.05,
+    restitution: 0.0
 });
 world.addContactMaterial(ballWallContactMaterial);
 
@@ -163,9 +164,9 @@ for (let i = 0; i < 16; i++) { // Create 16 balls (0-15)
         material: ballMaterial
     });
 
-    // Enable CCD for fast-moving balls
-    ballBody.ccdSpeedThreshold = 10;
-    ballBody.ccdMotionThreshold = ballRadius;
+    // Enable CCD for all balls to prevent tunneling
+    // ballBody.ccdSpeedThreshold = 0.1;
+    // ballBody.ccdMotionThreshold = ballRadius;
 
     world.addBody(ballBody);
     balls.push(ballBody);
