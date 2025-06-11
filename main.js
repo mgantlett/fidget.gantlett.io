@@ -38,13 +38,12 @@ const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00, opacity: 0.
 const cubeLine = new THREE.LineSegments(cubeEdges, edgesMaterial);
 scene.add(cubeLine);
 
-const cubeBody = new CANNON.Body({ mass: 0 }); // mass = 0 makes it static
+const cubeBody = new CANNON.Body({ mass: 0, material: wallMaterial }); // mass = 0 makes it static
 cubeBody.type = CANNON.Body.KINEMATIC;
 world.addBody(cubeBody);
 
 // Add walls to the cube body
 const wallThickness = 0.1;
-const wallMaterialOptions = { friction: 0.1, restitution: 0.7 };
 
 // Create 6 walls
 const wallShapes = [
@@ -174,92 +173,83 @@ for (let i = 0; i < 16; i++) { // Create 16 balls (0-15)
 
 camera.position.z = 20;
 
-// Mouse controls
-let previousMousePosition = { x: 0, y: 0 };
-let isMouseDown = false;
-let previousPinchDistance = null;
-let touchStartTime = 0;
-let touchMoved = false;
+// Device-agnostic input handling
+const inputState = {
+    isPointerDown: false,
+    previousPosition: { x: 0, y: 0 },
+    previousPinchDistance: null,
+    touchStartTime: 0,
+    touchMoved: false,
+};
 
-// Physics-based rotation
 const rotationSpeed = 0.1;
+const zoomSpeed = 0.1;
 const maxAngularVelocity = 10; // radians per second
 
-document.addEventListener('mousedown', (event) => {
-    isMouseDown = true;
-    previousMousePosition = { x: event.clientX, y: event.clientY };
-});
+function handlePointerDown(x, y) {
+    inputState.isPointerDown = true;
+    inputState.touchMoved = false;
+    inputState.touchStartTime = new Date().getTime();
+    inputState.previousPosition = { x, y };
+}
 
-document.addEventListener('mouseup', () => {
-    isMouseDown = false;
-});
-
-document.addEventListener('mousemove', (event) => {
-    if (!isMouseDown) return;
-
-    const deltaX = event.clientX - previousMousePosition.x;
-    const deltaY = event.clientY - previousMousePosition.y;
-
-    cubeBody.angularVelocity.y += deltaX * rotationSpeed * 0.1;
-    cubeBody.angularVelocity.x += deltaY * rotationSpeed * 0.1;
-
-    previousMousePosition = { x: event.clientX, y: event.clientY };
-});
-
-// Touch controls
-document.addEventListener('touchstart', (event) => {
-    isMouseDown = true;
-    touchMoved = false;
-    touchStartTime = new Date().getTime();
-    previousMousePosition = { x: event.touches[0].clientX, y: event.touches[0].clientY };
-});
-
-document.addEventListener('touchend', (event) => {
-    isMouseDown = false;
+function handlePointerUp() {
+    inputState.isPointerDown = false;
+    inputState.previousPinchDistance = null;
     const touchEndTime = new Date().getTime();
-    if (!touchMoved && touchEndTime - touchStartTime < 200) { // Tap gesture
-        const newColor = new THREE.Color(Math.random(), Math.random(), Math.random());
-        cubeMaterial.color.set(newColor);
-        edgesMaterial.color.set(newColor);
+    if (!inputState.touchMoved && touchEndTime - inputState.touchStartTime < 200) {
+        changeCubeColor();
     }
-});
+}
 
-document.addEventListener('touchmove', (event) => {
-    if (!isMouseDown) return;
+function handlePointerMove(x, y, touches) {
+    if (!inputState.isPointerDown) return;
+    inputState.touchMoved = true;
 
-    event.preventDefault();
-
-    // Handle pinch-to-zoom
-    touchMoved = true;
-    if (event.touches.length === 2) {
-        const touch1 = event.touches[0];
-        const touch2 = event.touches[1];
+    if (touches && touches.length === 2) { // Pinch-to-zoom
+        const touch1 = touches[0];
+        const touch2 = touches[1];
         const distance = Math.hypot(touch1.pageX - touch2.pageX, touch1.pageY - touch2.pageY);
-
-        if (previousPinchDistance) {
-            const delta = distance - previousPinchDistance;
-            camera.position.z -= delta * 0.1;
+        if (inputState.previousPinchDistance) {
+            const delta = distance - inputState.previousPinchDistance;
+            camera.position.z -= delta * zoomSpeed;
         }
-        previousPinchDistance = distance;
-        return; // Skip rotation when zooming
-    } else {
-        previousPinchDistance = null;
+        inputState.previousPinchDistance = distance;
+    } else { // Pan/Rotate
+        const deltaX = x - inputState.previousPosition.x;
+        const deltaY = y - inputState.previousPosition.y;
+        cubeBody.angularVelocity.y += deltaX * rotationSpeed * 0.1;
+        cubeBody.angularVelocity.x += deltaY * rotationSpeed * 0.1;
+        inputState.previousPosition = { x, y };
     }
+}
 
-    const deltaX = event.touches[0].clientX - previousMousePosition.x;
-    const deltaY = event.touches[0].clientY - previousMousePosition.y;
+function changeCubeColor() {
+    const newColor = new THREE.Color(Math.random(), Math.random(), Math.random());
+    cubeMaterial.color.set(newColor);
+    edgesMaterial.color.set(newColor);
+}
 
-    cubeBody.angularVelocity.y += deltaX * rotationSpeed * 0.1;
-    cubeBody.angularVelocity.x += deltaY * rotationSpeed * 0.1;
-
-    previousMousePosition = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+// Registering event listeners
+document.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
+document.addEventListener('mouseup', handlePointerUp);
+document.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
+document.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+document.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    handlePointerUp();
+}, { passive: false });
+document.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    handlePointerMove(e.touches[0].clientX, e.touches[0].clientY, e.touches);
 }, { passive: false });
 
 document.addEventListener('keydown', (event) => {
     if (event.code === 'Space') {
-        const newColor = new THREE.Color(Math.random(), Math.random(), Math.random());
-        cubeMaterial.color.set(newColor);
-        edgesMaterial.color.set(newColor);
+        changeCubeColor();
     }
 });
 
@@ -270,21 +260,17 @@ document.addEventListener('wheel', (event) => {
 
 // Animation loop
 const clock = new THREE.Clock();
-let oldElapsedTime = 0;
 
 function animate() {
-    const elapsedTime = clock.getElapsedTime();
-    const deltaTime = elapsedTime - oldElapsedTime;
-    oldElapsedTime = elapsedTime;
+    const deltaTime = clock.getDelta();
 
     // Step the physics world
-    world.step(1 / 60, deltaTime, 20); // Increased maxSubSteps from 10 to 20
+    world.step(1 / 60, deltaTime, 20);
 
-    // Since the cube is now a kinematic body, the physics engine handles its rotation based on its angular velocity.
-    // We can apply damping if we want it to slow down. The user wants it to spin indefinitely.
-    if (!isMouseDown) {
-        // No damping to let it spin forever.
-        // For a slowing effect, you could use:
+    // The cube is a kinematic body, so the physics engine handles its rotation based on angular velocity.
+    // No damping is applied, allowing it to spin indefinitely as requested.
+    if (!inputState.isPointerDown) {
+        // To apply damping for a slowing effect, you could use:
         // cubeBody.angularVelocity.scale(0.98, cubeBody.angularVelocity);
     }
 
