@@ -176,35 +176,39 @@ camera.position.z = 20;
 // Device-agnostic input handling
 const inputState = {
     isPointerDown: false,
+    startPosition: { x: 0, y: 0 },
     previousPosition: { x: 0, y: 0 },
     previousPinchDistance: null,
     touchStartTime: 0,
-    touchMoved: false,
 };
 
 const rotationSpeed = 0.1;
 const zoomSpeed = 0.1;
+const tapThreshold = 10; // Max distance in pixels for a tap
+const tapTimeLimit = 200; // Max time in ms for a tap
 const maxAngularVelocity = 10; // radians per second
 
 function handlePointerDown(x, y) {
     inputState.isPointerDown = true;
-    inputState.touchMoved = false;
     inputState.touchStartTime = new Date().getTime();
+    inputState.startPosition = { x, y };
     inputState.previousPosition = { x, y };
 }
 
-function handlePointerUp() {
+function handlePointerUp(x, y) {
     inputState.isPointerDown = false;
     inputState.previousPinchDistance = null;
     const touchEndTime = new Date().getTime();
-    if (!inputState.touchMoved && touchEndTime - inputState.touchStartTime < 200) {
+
+    const distance = Math.hypot(x - inputState.startPosition.x, y - inputState.startPosition.y);
+
+    if (touchEndTime - inputState.touchStartTime < tapTimeLimit && distance < tapThreshold) {
         changeCubeColor();
     }
 }
 
 function handlePointerMove(x, y, touches) {
     if (!inputState.isPointerDown) return;
-    inputState.touchMoved = true;
 
     if (touches && touches.length === 2) { // Pinch-to-zoom
         const touch1 = touches[0];
@@ -232,15 +236,16 @@ function changeCubeColor() {
 
 // Registering event listeners
 document.addEventListener('mousedown', (e) => handlePointerDown(e.clientX, e.clientY));
-document.addEventListener('mouseup', handlePointerUp);
+document.addEventListener('mouseup', (e) => handlePointerUp(e.clientX, e.clientY));
 document.addEventListener('mousemove', (e) => handlePointerMove(e.clientX, e.clientY));
+
 document.addEventListener('touchstart', (e) => {
     e.preventDefault();
     handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: false });
 document.addEventListener('touchend', (e) => {
     e.preventDefault();
-    handlePointerUp();
+    handlePointerUp(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
 }, { passive: false });
 document.addEventListener('touchmove', (e) => {
     e.preventDefault();
